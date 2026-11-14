@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "bhj.sprawlfm",
+  "name": "SPRAWL FM",
+  "version": "1.0.0",
+  "author": "bhj",
+  "description": "SPRAWL FM Icecast radio in the bar: play/pause, now playing, and channel switching.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "SPRAWL FM",
+    "description": "Tune the SPRAWL FM pirate signal. Left = play/pause, click the title for channels, scroll = next channel, right-click a channel to make it the default.",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "maxLabelWidth": 180,
+      "refreshIntervalSec": 15,
+      "defaultChannel": "",
+      "showTrackTitle": false
+    },
+    "schema": [
+      {
+        "key": "showTrackTitle",
+        "type": "boolean",
+        "label": "Show track title on bar",
+        "defaultValue": false
+      },
+      {
+        "key": "defaultChannel",
+        "type": "string",
+        "label": "Default channel (slug; empty = remember last)",
+        "defaultValue": ""
+      },
+      {
+        "key": "maxLabelWidth",
+        "type": "integer",
+        "label": "Max title width (px)",
+        "min": 0,
+        "max": 600,
+        "step": 10,
+        "defaultValue": 180
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Now-playing refresh (seconds)",
+        "min": 5,
+        "max": 300,
+        "step": 5,
+        "defaultValue": 15
+      }
+    ]
+  },
+  "keepLoaded": true
+}
