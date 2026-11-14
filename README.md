@@ -20,7 +20,7 @@ An Omarchy shell widget for listening to [SPRAWL FM](https://sprawlfm.com/). Tun
 ## Installation
 
 ```sh
-omarchy plugin add https://github.com/chitin-net/sprawl-fm-omarchy.git --enable
+omarchy plugin add https://github.com/ben-chitin/sprawl-fm-omarchy.git --enable
 ```
 
 ## Controls
