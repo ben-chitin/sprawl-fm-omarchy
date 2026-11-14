@@ -23,8 +23,6 @@ An Omarchy shell widget for listening to [SPRAWL FM](https://sprawlfm.com/). Tun
 omarchy plugin add https://github.com/chitin-net/sprawl-fm-omarchy.git --enable
 ```
 
-If an older copy of the plugin with the ID `bhj.sprawlfm` is already installed, remove or back it up before installing this repository. The plugin ID must be unique.
-
 ## Controls
 
 - Click the play/pause icon in the bar to start or stop playback.
