@@ -46,6 +46,31 @@ BarWidget {
   function close() { popupOpen = false }
   function togglePanel() { popupOpen = !popupOpen }
 
+  // Keyboard cursor over the channel list, as the stock panels have one: the
+  // first arrow press shows it on the channel playing, and it is gone again
+  // each time the panel opens.
+  property bool cursorActive: false
+  property int cursorIndex: 0
+  onPopupOpenChanged: if (popupOpen) cursorActive = false
+
+  function moveCursor(dy) {
+    var count = channels.length
+    if (count === 0) return
+    if (!cursorActive) {
+      cursorActive = true
+      cursorIndex = Math.max(0, channels.indexOf(channel))
+      return
+    }
+    cursorIndex = (cursorIndex + dy + count) % count
+  }
+
+  function activateCursor() {
+    if (!service) return
+    if (!cursorActive) { service.toggle(); return }
+    service.tune(cursorIndex)
+    service.play()
+  }
+
   function handleClick(button) {
     if (!service) return
     if (button === Qt.RightButton) popupOpen = !popupOpen
@@ -159,209 +184,228 @@ BarWidget {
     }
   }
 
-  PopupCard {
+  // A layer-shell panel like the stock dropdowns, not an xdg-popup off the
+  // bar: it takes the keyboard when summoned, and Glassy's layer rule frosts
+  // it along with them.
+  KeyboardPanel {
     id: popup
     anchorItem: root
     bar: root.bar
     owner: root
     open: root.popupOpen
+    focusTarget: keyCatcher
     contentWidth: popup.fittedContentWidth(Style.space(320))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
 
-    Column {
-      id: column
+    PanelKeyCatcher {
+      id: keyCatcher
       anchors.fill: parent
-      spacing: Style.space(10)
-
-      Row {
-        spacing: Style.space(10)
-        width: parent.width
-
-        Text {
-          anchors.verticalCenter: parent.verticalCenter
-          textFormat: Text.PlainText
-          text: "󰝚"
-          color: root.panelFg
-          font.family: root.bar ? root.bar.fontFamily : "monospace"
-          font.pixelSize: Style.font.displayLarge
-        }
-
-        Column {
-          spacing: Style.space(2)
-          width: parent.width - Style.space(40)
-
-          Text {
-            textFormat: Text.PlainText
-            text: root.trackTitle || (root.playing ? "Tuning in…" : "Off air")
-            color: root.panelFg
-            font.family: root.bar ? root.bar.fontFamily : "monospace"
-            font.pixelSize: Style.font.subtitle
-            font.bold: true
-            elide: Text.ElideRight
-            width: parent.width
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            text: "SPRAWL FM · " + root.channel.name + " · 128k mp3"
-            color: Qt.darker(root.panelFg, 1.3)
-            font.family: root.bar ? root.bar.fontFamily : "monospace"
-            font.pixelSize: Style.font.bodySmall
-            elide: Text.ElideRight
-            width: parent.width
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            text: root.listeners >= 0 ? root.listeners + " listening" : ""
-            color: Qt.darker(root.panelFg, 1.6)
-            font.family: root.bar ? root.bar.fontFamily : "monospace"
-            font.pixelSize: Style.font.caption
-            visible: text !== ""
-          }
+      onMoveRequested: function(dx, dy) { if (dy !== 0) root.moveCursor(dy) }
+      onActivateRequested: root.activateCursor()
+      onCloseRequested: root.close()
+      onTextKey: function(t, modifiers) {
+        if (t === "d" && root.cursorActive && root.service) {
+          var c = root.channels[root.cursorIndex]
+          root.setDefaultChannel(c.slug, root.cursorIndex === root.service.defaultChannelIndex)
         }
       }
-
-      Row {
-        anchors.horizontalCenter: parent.horizontalCenter
-        spacing: Style.space(6)
-
-        Button {
-          iconText: "󰒮"
-          foreground: root.panelFg
-          horizontalPadding: Style.spacing.controlPaddingX
-          verticalPadding: Style.spacing.controlPaddingY
-          onClicked: if (root.service) root.service.previous()
-        }
-
-        Button {
-          iconText: root.playing ? "󰏤" : "󰐊"
-          foreground: root.panelFg
-          horizontalPadding: Style.spacing.panelGap
-          verticalPadding: Style.spacing.controlPaddingY
-          iconSize: Style.font.iconLarge
-          onClicked: if (root.service) root.service.toggle()
-        }
-
-        Button {
-          iconText: "󰒭"
-          foreground: root.panelFg
-          horizontalPadding: Style.spacing.controlPaddingX
-          verticalPadding: Style.spacing.controlPaddingY
-          onClicked: if (root.service) root.service.next()
-        }
-      }
-
-      Button {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: root.showTrackTitle ? "Hide track title from bar" : "Show track title on bar"
-        foreground: root.panelFg
-        bordered: true
-        focusable: true
-        onClicked: if (root.bar) root.bar.run("omarchy bar set bhj.sprawlfm showTrackTitle " + (root.showTrackTitle ? "false" : "true") + " --json")
-      }
-
-      PanelSeparator { foreground: root.panelFg }
 
       Column {
-        id: channelList
-        width: parent.width
-        spacing: Style.space(4)
+        id: column
+        anchors.fill: parent
+        spacing: Style.space(10)
 
-        Repeater {
-          model: root.channels
+        Row {
+          spacing: Style.space(10)
+          width: parent.width
 
-          BorderSurface {
-            id: channelRow
-            required property int index
-            required property var modelData
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "󰝚"
+            color: root.panelFg
+            font.family: root.bar ? root.bar.fontFamily : "monospace"
+            font.pixelSize: Style.font.displayLarge
+          }
 
-            readonly property var info: root.service ? root.service.sourceFor(modelData.mount) : null
-            readonly property bool selected: root.channel && index === root.channels.indexOf(root.channel)
-            readonly property bool isDefault: root.service && index === root.service.defaultChannelIndex
-            readonly property string detail: {
-              var parts = []
-              var genre = Channels.genreOf(info)
-              if (genre !== "") parts.push(genre)
-              var live = Channels.listenersOf(info)
-              if (live >= 0) parts.push(live + " listening")
-              if (isDefault) parts.push("default")
-              return parts.join(" · ")
+          Column {
+            spacing: Style.space(2)
+            width: parent.width - Style.space(40)
+
+            Text {
+              textFormat: Text.PlainText
+              text: root.trackTitle || (root.playing ? "Tuning in…" : "Off air")
+              color: root.panelFg
+              font.family: root.bar ? root.bar.fontFamily : "monospace"
+              font.pixelSize: Style.font.subtitle
+              font.bold: true
+              elide: Text.ElideRight
+              width: parent.width
             }
 
-            width: channelList.width
-            height: rowInner.implicitHeight + Style.space(10)
-            radius: Style.spacing.labelGap
-            color: selected ? Style.selectedFillFor(root.panelFg, Color.accent) : "transparent"
-            borderSpec: selected ? Border.controlSpec("normal", root.panelFg, Color.accent) : Border.none()
+            Text {
+              textFormat: Text.PlainText
+              text: "SPRAWL FM · " + root.channel.name + " · 128k mp3"
+              color: Qt.darker(root.panelFg, 1.3)
+              font.family: root.bar ? root.bar.fontFamily : "monospace"
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+              width: parent.width
+            }
 
-            Row {
-              id: rowInner
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: channelRow.borderLeft + Style.space(8)
-              anchors.rightMargin: channelRow.borderRight + Style.space(8)
-              spacing: Style.space(8)
+            Text {
+              textFormat: Text.PlainText
+              text: root.listeners >= 0 ? root.listeners + " listening" : ""
+              color: Qt.darker(root.panelFg, 1.6)
+              font.family: root.bar ? root.bar.fontFamily : "monospace"
+              font.pixelSize: Style.font.caption
+              visible: text !== ""
+            }
+          }
+        }
 
-              Text {
-                textFormat: Text.PlainText
-                text: channelRow.selected && root.playing ? "󰏤" : "󰐊"
-                color: root.panelFg
-                font.family: root.bar ? root.bar.fontFamily : "monospace"
-                font.pixelSize: Style.font.body
-                width: Style.space(18)
-                horizontalAlignment: Text.AlignHCenter
-                anchors.verticalCenter: parent.verticalCenter
+        Row {
+          anchors.horizontalCenter: parent.horizontalCenter
+          spacing: Style.space(6)
+
+          Button {
+            iconText: "󰒮"
+            foreground: root.panelFg
+            horizontalPadding: Style.spacing.controlPaddingX
+            verticalPadding: Style.spacing.controlPaddingY
+            onClicked: if (root.service) root.service.previous()
+          }
+
+          Button {
+            iconText: root.playing ? "󰏤" : "󰐊"
+            foreground: root.panelFg
+            horizontalPadding: Style.spacing.panelGap
+            verticalPadding: Style.spacing.controlPaddingY
+            iconSize: Style.font.iconLarge
+            onClicked: if (root.service) root.service.toggle()
+          }
+
+          Button {
+            iconText: "󰒭"
+            foreground: root.panelFg
+            horizontalPadding: Style.spacing.controlPaddingX
+            verticalPadding: Style.spacing.controlPaddingY
+            onClicked: if (root.service) root.service.next()
+          }
+        }
+
+        Button {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: root.showTrackTitle ? "Hide track title from bar" : "Show track title on bar"
+          foreground: root.panelFg
+          bordered: true
+          focusable: true
+          onClicked: if (root.bar) root.bar.run("omarchy bar set bhj.sprawlfm showTrackTitle " + (root.showTrackTitle ? "false" : "true") + " --json")
+        }
+
+        PanelSeparator { foreground: root.panelFg }
+
+        Column {
+          id: channelList
+          width: parent.width
+          spacing: Style.space(4)
+
+          Repeater {
+            model: root.channels
+
+            BorderSurface {
+              id: channelRow
+              required property int index
+              required property var modelData
+
+              readonly property var info: root.service ? root.service.sourceFor(modelData.mount) : null
+              readonly property bool selected: root.channel && index === root.channels.indexOf(root.channel)
+              readonly property bool isDefault: root.service && index === root.service.defaultChannelIndex
+              readonly property bool hasCursor: root.cursorActive && index === root.cursorIndex
+              readonly property string detail: {
+                var parts = []
+                var genre = Channels.genreOf(info)
+                if (genre !== "") parts.push(genre)
+                var live = Channels.listenersOf(info)
+                if (live >= 0) parts.push(live + " listening")
+                if (isDefault) parts.push("default")
+                return parts.join(" · ")
               }
 
-              Column {
-                width: parent.width - Style.space(26)
-                spacing: Style.space(1)
+              width: channelList.width
+              height: rowInner.implicitHeight + Style.space(10)
+              radius: Style.spacing.labelGap
+              color: selected ? Style.selectedFillFor(root.panelFg, Color.accent) : "transparent"
+              borderSpec: selected || hasCursor ? Border.controlSpec(hasCursor ? "focus" : "normal", root.panelFg, Color.accent) : Border.none()
+
+              Row {
+                id: rowInner
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: channelRow.borderLeft + Style.space(8)
+                anchors.rightMargin: channelRow.borderRight + Style.space(8)
+                spacing: Style.space(8)
 
                 Text {
                   textFormat: Text.PlainText
-                  text: channelRow.modelData.name
+                  text: channelRow.selected && root.playing ? "󰏤" : "󰐊"
                   color: root.panelFg
                   font.family: root.bar ? root.bar.fontFamily : "monospace"
-                  font.pixelSize: Style.font.bodySmall
-                  font.bold: channelRow.selected
-                  elide: Text.ElideRight
-                  width: parent.width
+                  font.pixelSize: Style.font.body
+                  width: Style.space(18)
+                  horizontalAlignment: Text.AlignHCenter
+                  anchors.verticalCenter: parent.verticalCenter
                 }
 
-                Text {
-                  textFormat: Text.PlainText
-                  text: channelRow.detail
-                  color: Qt.darker(root.panelFg, 1.5)
-                  font.family: root.bar ? root.bar.fontFamily : "monospace"
-                  font.pixelSize: Style.font.caption
-                  elide: Text.ElideRight
-                  width: parent.width
-                  visible: text !== ""
-                }
-              }
-            }
+                Column {
+                  width: parent.width - Style.space(26)
+                  spacing: Style.space(1)
+                  anchors.verticalCenter: parent.verticalCenter
 
-            MouseArea {
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              acceptedButtons: Qt.LeftButton | Qt.RightButton
-              onClicked: function(mouse) {
-                if (!root.service) return
-                if (mouse.button === Qt.RightButton) {
-                  root.setDefaultChannel(channelRow.modelData.slug, channelRow.isDefault)
-                  return
+                  Text {
+                    textFormat: Text.PlainText
+                    text: channelRow.modelData.name
+                    color: root.panelFg
+                    font.family: root.bar ? root.bar.fontFamily : "monospace"
+                    font.pixelSize: Style.font.bodySmall
+                    font.bold: channelRow.selected
+                    elide: Text.ElideRight
+                    width: parent.width
+                  }
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: channelRow.detail
+                    color: Qt.darker(root.panelFg, 1.5)
+                    font.family: root.bar ? root.bar.fontFamily : "monospace"
+                    font.pixelSize: Style.font.caption
+                    elide: Text.ElideRight
+                    width: parent.width
+                    visible: text !== ""
+                  }
                 }
-                root.service.tune(channelRow.index)
-                root.service.play()
               }
-              onEntered: if (root.bar) root.bar.showTooltip(channelRow,
-                channelRow.isDefault ? "Left: tune in · Right: clear default"
-                                     : "Left: tune in · Right: make default")
-              onExited: if (root.bar) root.bar.hideTooltip(channelRow)
+
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: function(mouse) {
+                  if (!root.service) return
+                  if (mouse.button === Qt.RightButton) {
+                    root.setDefaultChannel(channelRow.modelData.slug, channelRow.isDefault)
+                    return
+                  }
+                  root.service.tune(channelRow.index)
+                  root.service.play()
+                }
+                onEntered: if (root.bar) root.bar.showTooltip(channelRow,
+                  channelRow.isDefault ? "Left: tune in · Right: clear default"
+                                       : "Left: tune in · Right: make default")
+                onExited: if (root.bar) root.bar.hideTooltip(channelRow)
+              }
             }
           }
         }

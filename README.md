@@ -32,6 +32,7 @@ omarchy plugin add https://github.com/ben-chitin/sprawl-fm-omarchy.git --enable
 - Click the play/pause icon in the bar to start or stop playback.
 - Click the bar label (or right-click the widget) to open the channel popup.
 - Scroll over the widget to change channels. In the popup, click a channel to tune and play it; right-click a channel to set or clear it as the default.
+- In the popup, Up/Down (or j/k) highlight a channel, Enter or Space tunes in to it (or plays/pauses before anything is highlighted), d sets or clears the highlighted channel as the default, and Esc closes the popup.
 - Use the popup's track-title button to switch what the bar displays. The preference persists in the Omarchy bar configuration.
 - Middle-click the widget to open SPRAWL FM in a browser.
 
