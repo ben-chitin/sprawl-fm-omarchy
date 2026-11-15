@@ -2,6 +2,10 @@
 
 An Omarchy shell widget for listening to [SPRAWL FM](https://sprawlfm.com/). Tune between eight radio channels, control playback from the bar, and see the current track and listener counts in a popup.
 
+![The desktop with the SPRAWL FM widget in the bar and its popup open](assets/desktop.png)
+
+The widget in the bar, with its popup open.
+
 ![SPRAWL FM widget popup](assets/widget.png)
 
 ## Features
