@@ -16,6 +16,11 @@ BarWidget {
   readonly property bool playing: service ? service.playing : false
   readonly property string trackTitle: service ? service.trackTitle : ""
   readonly property int listeners: service ? service.listeners : -1
+  readonly property int volume: service ? service.volume : 100
+
+  function nudgeVolume(delta) {
+    if (service) service.setVolume(volume + delta, true)
+  }
 
   readonly property real maxLabelWidth: setting("maxLabelWidth", 180)
   readonly property color fg: bar ? bar.barForeground : "white"
@@ -200,7 +205,10 @@ BarWidget {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onMoveRequested: function(dx, dy) { if (dy !== 0) root.moveCursor(dy) }
+      onMoveRequested: function(dx, dy) {
+        if (dy !== 0) root.moveCursor(dy)
+        else if (dx !== 0) root.nudgeVolume(dx > 0 ? 5 : -5)
+      }
       onActivateRequested: root.activateCursor()
       onCloseRequested: root.close()
       onTextKey: function(t, modifiers) {
@@ -291,6 +299,57 @@ BarWidget {
             horizontalPadding: Style.spacing.controlPaddingX
             verticalPadding: Style.spacing.controlPaddingY
             onClicked: if (root.service) root.service.next()
+          }
+        }
+
+        Item {
+          id: volumeRow
+          width: parent.width
+          implicitHeight: volumeSlider.implicitHeight
+
+          Text {
+            id: volumeIcon
+            textFormat: Text.PlainText
+            text: root.volume === 0 ? "󰝟" : (root.volume < 50 ? "󰖀" : "󰕾")
+            color: root.panelFg
+            font.family: root.bar ? root.bar.fontFamily : "monospace"
+            font.pixelSize: Style.font.body
+            width: Style.space(18)
+            horizontalAlignment: Text.AlignHCenter
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+          }
+
+          PanelSlider {
+            id: volumeSlider
+            bar: root.bar
+            anchors.left: volumeIcon.right
+            anchors.right: volumePercent.left
+            anchors.leftMargin: Style.space(6)
+            anchors.rightMargin: Style.space(6)
+            anchors.verticalCenter: parent.verticalCenter
+            minimum: 0
+            maximum: 100
+            step: 5
+            integer: true
+            value: root.volume
+            // Live while dragging, saved once on release.
+            onMoved: function(v) { if (root.service) root.service.setVolume(v, false) }
+            onReleased: function(v) { if (root.service) root.service.setVolume(v, true) }
+          }
+
+          Text {
+            id: volumePercent
+            textFormat: Text.PlainText
+            text: Math.round(volumeSlider.dragging ? volumeSlider.liveValue : root.volume) + "%"
+            color: Qt.darker(root.panelFg, 1.4)
+            font.family: root.bar ? root.bar.fontFamily : "monospace"
+            font.pixelSize: Style.font.caption
+            font.bold: true
+            width: Style.space(36)
+            horizontalAlignment: Text.AlignRight
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
           }
         }
 

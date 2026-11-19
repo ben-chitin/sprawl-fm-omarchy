@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "bhj.sprawlfm",
   "name": "SPRAWL FM",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "bhj",
   "description": "SPRAWL FM Icecast radio in the bar: play/pause, now playing, and channel switching.",
   "kinds": [

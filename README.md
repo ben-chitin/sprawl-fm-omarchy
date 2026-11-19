@@ -13,6 +13,7 @@ The widget in the bar, with its popup open.
 - Play and pause the stream with `mpv`; switch channels without opening a browser.
 - The bar alternates between **SPRAWL** and the channel name, holding each for nine seconds with a one-second slide. All Frequencies is abbreviated to **ALL FREQ**.
 - Choose **Show track title on bar** in the popup to show the current track instead; select the button again to return to the alternating display. Long titles are shortened to fit.
+- Set the stream volume from the popup, independent of the system volume. It changes live without restarting the stream and is remembered across restarts.
 - View track information, channel genres, and listener counts in the popup. Set a default channel or remember the last tuned channel.
 
 ## Requirements
@@ -33,6 +34,7 @@ omarchy plugin add https://github.com/ben-chitin/sprawl-fm-omarchy.git --enable
 - Click the bar label (or right-click the widget) to open the channel popup.
 - Scroll over the widget to change channels. In the popup, click a channel to tune and play it; right-click a channel to set or clear it as the default.
 - In the popup, Up/Down (or j/k) highlight a channel, Enter or Space tunes in to it (or plays/pauses before anything is highlighted), d sets or clears the highlighted channel as the default, and Esc closes the popup.
+- Drag or scroll the volume slider in the popup, or press Left/Right (h/l) to change the volume in 5% steps.
 - Use the popup's track-title button to switch what the bar displays. The preference persists in the Omarchy bar configuration.
 - Middle-click the widget to open SPRAWL FM in a browser.
 

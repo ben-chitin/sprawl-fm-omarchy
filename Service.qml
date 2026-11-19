@@ -20,6 +20,12 @@ Item {
   readonly property var channel: channels[channelIndex]
   readonly property bool playing: mpvProc.running
 
+  // Stream volume, 0-100, mpv's own scale. Separate from the system volume so
+  // the radio can sit under other audio. Persisted beside the channel.
+  property int volume: 100
+  property int ipcAttempts: 0
+  readonly property string mpvSocketPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/sprawlfm-mpv.sock"
+
   // Settings read off this plugin's entry in shell.json, so `omarchy bar set
   // bhj.sprawlfm <key> <value>` and hand edits both take effect live.
   readonly property var shellConfig: shell ? shell.shellConfig : null
@@ -59,9 +65,38 @@ Item {
     mpvProc.command = [
       "mpv", "--no-video", "--no-terminal", "--really-quiet",
       "--stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5",
+      "--volume=" + volume,
+      "--input-ipc-server=" + mpvSocketPath,
       Channels.streamUrl(channel.mount)
     ]
     mpvProc.running = true
+  }
+
+  // Live changes go to the running mpv over its JSON IPC socket, so the
+  // stream never restarts; a stopped stream just picks the value up through
+  // --volume on the next play. `persist` is false while a slider is dragging
+  // so the state file is written once, on release.
+  function setVolume(v, persist) {
+    var next = Math.max(0, Math.min(100, Math.round(Number(v))))
+    if (isNaN(next)) return
+    volume = next
+    ipcAttempts = 0
+    sendVolume()
+    if (persist !== false) volumeFile.setText(String(next) + "\n")
+  }
+
+  function sendVolume() {
+    if (!mpvProc.running) return
+    if (mpvIpc.connected) {
+      mpvIpc.write(JSON.stringify({ command: ["set_property", "volume", root.volume] }) + "\n")
+      mpvIpc.flush()
+    } else if (ipcAttempts < 10) {
+      ipcAttempts++
+      // mpv creates the socket a moment after launch; connecting sends the
+      // current value, and the retry covers a connect that beat the socket.
+      mpvIpc.connected = true
+      ipcRetry.restart()
+    }
   }
 
   function stop() {
@@ -108,13 +143,16 @@ Item {
     function previous(): void { root.previous() }
     function refresh(): void { root.refresh() }
     function channel(): string { return root.channel.slug }
+    function setVolume(percent: int): void { root.setVolume(percent, true) }
+    function getVolume(): int { return root.volume }
     function state(): string {
       return JSON.stringify({
         playing: root.playing,
         channel: root.channel.slug,
         name: root.channel.name,
         title: root.trackTitle,
-        listeners: root.listeners
+        listeners: root.listeners,
+        volume: root.volume
       })
     }
   }
@@ -157,9 +195,36 @@ Item {
     onTriggered: root.resolveInitialChannel()
   }
 
+  FileView {
+    id: volumeFile
+    path: root.stateDir + "/volume"
+    atomicWrites: true
+    printErrors: false
+    onLoaded: {
+      var v = parseInt(String(text() || "").trim(), 10)
+      if (!isNaN(v)) root.volume = Math.max(0, Math.min(100, v))
+    }
+  }
+
+  Socket {
+    id: mpvIpc
+    path: root.mpvSocketPath
+    // Replies are not needed; read them so they do not pile up.
+    parser: SplitParser { onRead: function(data) {} }
+    onConnectedChanged: if (connected) { root.ipcAttempts = 0; root.sendVolume() }
+  }
+
+  Timer {
+    id: ipcRetry
+    interval: 400
+    repeat: false
+    onTriggered: if (mpvProc.running && !mpvIpc.connected) root.sendVolume()
+  }
+
   Process {
     id: mpvProc
     onExited: {
+      mpvIpc.connected = false
       if (!root.restartPending) return
       root.restartPending = false
       Qt.callLater(root.play)
